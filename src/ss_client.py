@@ -26,3 +26,343 @@
 """
 The Serial Server client runs on the host machine.
 """
+
+"""
+The Serial Server client runs on the local machine.
+Its purpose is to -
+    Initialise the remote system.
+    Read data from the serial device and send to the romte device over UDP.
+    Read responsers from the remote device and write to the serial device.
+"""
+
+import os, sys
+import logging
+import traceback
+import serial
+import socket
+import threading
+import queue
+import pickle
+
+"""
+The server consists of two threads:
+    The serial thread and the UDP thread.
+        and a control class responsible for startup/shutdown.
+"""
+
+#=====================================================
+# UDP thread
+#===================================================== 
+class UDPThrd (threading.Thread):
+    
+    #-------------------------------------------------
+    # Initialisation
+    def __init__(self, reader_q, writer_q):
+        """
+        Constructor
+        
+        Arguments
+            reader_q    -- incoming data/requests
+            writer_q    -- outgoing data/requests
+            
+        """
+
+        super(UDPThrd, self).__init__()
+        
+        self.__reader_q = reader_q
+        self.__writer_q = Writer_q
+        
+        self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.__remote_ip = '192.168.1.110'
+        self.__remote_port = 10001
+        self.__addr = [self.__remote_ip, self.__remote_port]
+        self.__sock.settimeout(3)
+        
+        self.__terminate = False
+    
+    #-------------------------------------------------
+    # Terminate thread
+    def terminate(self):
+        """ Terminate thread """
+        
+        self.__terminate = True
+    
+    #-------------------------------------------------
+    # Thread entry point    
+    def run(self):
+        """ Listen for events """
+        
+            try:
+                # Send connect data to the remote device
+                data = [{"port": "COM1", "baud": 9600, "data_bits": 8, "parity": "N", "stop_bits": 2}]
+                self.__sock.send(pickle.dump({"reqst": "connect", "data": data}, self.__addr)
+            except socket.timeout:
+                print "Error sending connect data!"
+                return
+
+            # Processing loop
+            while not self.__terminate:
+                self.__process()
+
+    #-------------------------------------------------
+    # Process exchanges
+    def __process(self, data):
+        # We wait data from the serial class instance
+        # Format the data and send to the remote device over UDP
+        # Wait for response data and write to the serial device
+        
+        try:
+            data = self.__reader_q.get(timeout=0.1)
+        except queue.Empty:
+            continue
+        
+        # Dispatch data
+        try:
+            self.__sock.send(pickle.dump({"reqst": "data", "data": data}, self.__addr)
+        except socket.timeout:
+            print "Error sending serial data!"
+            return
+            
+        # Wait for any response
+        try:
+            data, self.__addr = self.__sock.recvfrom(100)
+        except socket.timeout:
+            # No response
+            return
+        
+        # Dispatch to serial class
+        d = pickle.loads(data)
+        if d["resp"]:
+            self.__writer_q.put(d["data"])
+            
+#=====================================================
+# Serial thread
+#===================================================== 
+class SerialThrd (threading.Thread):
+    
+    #-------------------------------------------------
+    # Initialisation
+    def __init__(self, reader_q, writer_q):
+        """
+        Constructor
+        
+        Arguments
+            reader_q    -- incoming data/requests
+            writer_q    -- outgoing data/requests
+            
+        """
+        
+        super(SerialThrd, self).__init__()
+
+        self.__reader_q = reader_q
+        self.__writer_q = Writer_q
+        self.__terminate = False
+        self.__ser = None
+        self.__resp = bytearray(100)
+    
+    #-------------------------------------------------
+    # Terminate thread
+    def terminate(self):
+        """ Terminate thread """
+        
+        self.__terminate = True
+    
+    #-------------------------------------------------
+    # Thread entry point    
+    def run(self):
+        """
+        Wait for data from q:
+        Format for requests is:
+            {"rqst":rqst_type, "data":[parameters or data]}
+            reqst_type : "connect", "disconnect", "serial_data"
+        
+        """
+        
+        # Outer loop
+        while not self.__terminate:
+            # Wait for the connect data
+            while True:
+                if self.__terminate:
+                    return
+                try:
+                    item = reader_q.get(timeout=1.0)
+                    if item["rqst"] == "connect":
+                        if not self.__do_connect(item["data"]):
+                            print("Failed to connect to serial port!")
+                            return
+                    else:
+                        continue
+                except Queue.Empty:
+                    continue
+            
+            # Main thread loop            
+            while not self.__terminate:
+                # Process send data
+                # Wait for response and dispatch
+                # We do not expect unsolicited data from the serial port
+                try:
+                    item = reader_q.get(timeout=0.1)
+                    if item["rqst"] == "disconnect":
+                        if self.__do_disconnect():
+                            break
+                        else:
+                            print("Failed to disconnect from serial port!")
+                            return
+                    elif item["rqst"] == "data":
+                        if self.__write_data(item["data"]):
+                            resp_size = self.__read_data():
+                                # There may be no response data so we can't treat it as an error
+                                if resp_size > 0:
+                                    self.__dispatch_data(resp_size)
+                                continue
+                        else:
+                            print("Failed to write [all] data to serial port! Attempting to continue.")
+                            continue
+                except Queue.Empty:
+                    continue
+        
+    #-------------------------------------------------
+    # Connect to serial port    
+    def __do_connect(self, data):
+        # Connect data:
+        # {"port": d, "baud": b, "data_bits": b, "parity": p, "stop_bits": s}
+        # Data is an array which contains 1 item for connect
+        p = data[0]
+        try:
+            self.__ser = serial.Serial( port=p["port"],
+                                        baudrate=p["baud"],
+                                        bytesize=p[data_bits],
+                                        parity=p[[parity],
+                                        stopbits=p["stop_bits"],
+                                        timeout=0.5,
+                                        xonxoff=0,
+                                        rtscts=0,
+                                        write_timeout=0.5)
+        except serial.SerialException:
+            print("Failed to open device %s!", p["port"])
+            return False
+        except serial.ValueException:
+            print("Parameter error in serial port %s parameters!", p["port"])
+            return False
+        return True    
+    
+    #-------------------------------------------------
+    # Disconnect from serial port    
+    def __do_disconnect():
+        
+        self.__ser.close()
+        return True
+    
+    #-------------------------------------------------
+    # Write data to serial port 
+    def __write_data(self, data):
+       
+        # Write data is a bytearray
+        try:
+            bytes_written = self.__ser.write(data)
+        except serial.SerialTimeoutException:
+            print ("Timeout writing serial data. Bytes written %d!", bytes_written)
+            return False
+        
+        # Check our write was successful
+        if bytes_written == len(data):
+            return True
+        else:
+            print ("Failed to write all serial data. Buffer %d, written %d!", len(data), bytes_written)
+            return False
+            
+    #-------------------------------------------------
+    # Read response data
+    def __read_data(self):
+       
+        i = 0
+        while True:
+            try:
+                self.__resp[i] = self.__ser.read(1)
+                i += 1
+            except serial.SerialTimeoutException:
+                # This is not an error as we don't know how many bytes to expect
+                # Therefore a timeout signals the end of the response data
+                break
+        
+        # Return size of response data   
+        return i
+    
+    #-------------------------------------------------
+    # Dispatch data
+    def __dispatch_data(self, size):
+       
+        actual_resp = self.resp_data[:size]
+        try:
+            self.__writer_q.put(actual_resp, timeout=0.1)
+        except queue.Full:
+            print("Exception queue full writing response data!")
+            return False
+        return True
+    
+#=====================================================
+# Main server class
+#===================================================== 
+class SerialClient: 
+    #-------------------------------------------------
+    # Initialisation
+    def __init__(self) :
+        """
+        Constructor
+        
+        Arguments
+            
+        """
+        # Create the inter-thread queues
+        self.__to_serial = queue.Queue(100)
+        self.__to_udp = queue.Queue(100)
+
+    #-------------------------------------------------
+    # Main
+    def main(self) :
+        """
+        Constructor
+        
+        Arguments
+            
+        """
+        
+        # Start the threads
+        self.__udp_thread = UDPThread(self.__to_udp, self.__to_serial)
+        self.__udp_thread.start()
+        self.__serial_thread = UDPThread(self.__to_serial, self.__to_udp)
+        self.__serial_thread.start()
+        
+        # Wait for exit
+        while True:
+            try:
+                time.sleep(1)
+            except KeyboardInterrupt:
+                break
+        
+        # Close threads    
+        self.__udp_thread.terminate()
+        self.__udp_thread.join()
+        self.__serial_thread.terminate()
+        self.__serial_thread.join()
+        
+        print("Serial Server Client exiting...")        
+
+#=====================================================
+# Entry point
+#=====================================================
+
+#-------------------------------------------------
+# Start processing and wait for user to exit the application
+def main():
+    try:
+        app = SerialClient()
+        sys.exit(app.main())
+        
+    except Exception as e:
+        print ('Exception from main SerialServer code','Exception [%s][%s]' % (str(e), traceback.format_exc()))
+
+#-------------------------------------------------
+# Enter here when run as script        
+if __name__ == '__main__':
+    main()
