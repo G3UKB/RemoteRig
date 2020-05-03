@@ -130,7 +130,7 @@ class UDPThrd (threading.Thread):
             # No response
             return
         
-        # Dispatch to serial class
+        # Dispatch to serial
         d = pickle.loads(data)
         if d["resp"]:
             self.__writer_q.put(d["data"])
