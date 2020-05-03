@@ -37,6 +37,7 @@ import serial
 import socket
 import threading
 import queue
+import pickle
 
 """
 The server consists of two threads:
@@ -67,7 +68,7 @@ class UDPThrd (threading.Thread):
         self.__writer_q = Writer_q
         
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.__sock.bind((EVNT_IP, EVNT_PORT))
+        self.__sock.bind(("localhost", 10001))
         self.__sock.settimeout(3)
         
         self.__terminate = False
@@ -86,11 +87,29 @@ class UDPThrd (threading.Thread):
         
         while not self.__terminate:
             try:
-                data, addr = self.__sock.recvfrom(100)
+                data, self.__addr = self.__sock.recvfrom(100)
             except socket.timeout:
                 continue
-            asciidata = data.decode(encoding='UTF-8')
+            self.__process(pickle.loads(data))
 
+    #-------------------------------------------------
+    # Process data
+    def __process(self, data):
+        # We simply dispatch data to the serial class instance
+        # The client is responsible for proper formatting of the request
+        try:
+            self.__writer_q.put(data, timeout=0.1)
+        except queue.Full:
+            print("Exception queue full writing request data!")
+            return False
+        
+        # Wait for any response
+        try:
+            item = reader_q.get(timeout=0.1)
+            self.__sock.sendto( pickle.dumps[{"resp":True, "data":[item]}], self.__addr)
+        except Queue.Empty:
+            self.__sock.sendto( pickle.dumps[{"resp":False, "data":[]}], self.__addr)
+        
 #=====================================================
 # Serial thread
 #===================================================== 
@@ -179,7 +198,7 @@ class SerialThrd (threading.Thread):
         
     #-------------------------------------------------
     # Connect to serial port    
-    def do_connect(self, data):
+    def __do_connect(self, data):
         # Connect data:
         # {"port": d, "baud": b, "data_bits": b, "parity": p, "stop_bits": s}
         # Data is an array which contains 1 item for connect
@@ -204,14 +223,14 @@ class SerialThrd (threading.Thread):
     
     #-------------------------------------------------
     # Disconnect from serial port    
-    def do_disconnect():
+    def __do_disconnect():
         
         self.__ser.close()
         return True
     
     #-------------------------------------------------
     # Write data to serial port 
-    def write_data(self, data):
+    def __write_data(self, data):
        
         # Write data is a bytearray
         try:
@@ -229,7 +248,7 @@ class SerialThrd (threading.Thread):
             
     #-------------------------------------------------
     # Read response data
-    def read_data(self):
+    def __read_data(self):
        
         i = 0
         while True:
@@ -246,7 +265,7 @@ class SerialThrd (threading.Thread):
     
     #-------------------------------------------------
     # Dispatch data
-    def dispatch_data(self, size):
+    def __dispatch_data(self, size):
        
         actual_resp = self.resp_data[:size]
         try:
