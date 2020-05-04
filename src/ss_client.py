@@ -38,6 +38,7 @@ Its purpose is to -
 import os, sys
 import logging
 import traceback
+from time import sleep
 import serial
 import socket
 import threading
@@ -70,12 +71,12 @@ class UDPThrd (threading.Thread):
         super(UDPThrd, self).__init__()
         
         self.__reader_q = reader_q
-        self.__writer_q = Writer_q
+        self.__writer_q = writer_q
         
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.__remote_ip = '192.168.1.110'
         self.__remote_port = 10001
-        self.__addr = [self.__remote_ip, self.__remote_port]
+        self.__addr = (self.__remote_ip, self.__remote_port)
         self.__sock.settimeout(3)
         
         self.__terminate = False
@@ -92,30 +93,30 @@ class UDPThrd (threading.Thread):
     def run(self):
         """ Listen for events """
         
-            # Temp connect data
-            data = [{"port": "COM1", "baud": 9600, "data_bits": 8, "parity": "N", "stop_bits": 2}]
-            # Open remote port
-            try:
-                # Send connect data to the remote device
-                self.__sock.send(pickle.dump({"reqst": "connect", "data": data}, self.__addr)
-            except socket.timeout:
-                print "Error sending connect data!"
-                return
+        # Temp connect data
+        data = [{"port": "COM4", "baud": 9600, "data_bits": 8, "parity": "N", "stop_bits": 2}]
+        # Open remote port
+        try:
+            # Send connect data to the remote device
+            self.__sock.sendto(pickle.dumps({"reqst": "connect", "data": data}), self.__addr)
+        except socket.timeout:
+            print ("Error sending connect data!")
+            return
 
-            # Processing loop
-            while not self.__terminate:
-                self.__process()
-                
-            try:
-                self.__sock.send(pickle.dump({"reqst": "disconnect", "data": []}, self.__addr)
-            except socket.timeout:
-                print "Error disconnecting!"
-                
-            print ("Serial Server client - UDP thread exiting...")
+        # Processing loop
+        while not self.__terminate:
+            self.__process()
+            
+        try:
+            self.__sock.sendto(pickle.dumps({"reqst": "disconnect", "data": []}), self.__addr)
+        except socket.timeout:
+            print ("Error disconnecting!")
+            
+        print ("Serial Client - UDP thread exiting...")
 
     #-------------------------------------------------
     # Process exchanges
-    def __process(self, data):
+    def __process(self):
         # We wait data from the serial class instance
         # Format the data and send to the remote device over UDP
         # Wait for response data and write to the serial device
@@ -123,13 +124,13 @@ class UDPThrd (threading.Thread):
         try:
             data = self.__reader_q.get(timeout=0.1)
         except queue.Empty:
-            continue
+            return
         
         # Dispatch data
         try:
-            self.__sock.send(pickle.dump({"reqst": "data", "data": data}, self.__addr)
+            self.__sock.send(pickle.dump({"reqst": "data", "data": data}, self.__addr))
         except socket.timeout:
-            print "Error sending serial data!"
+            print ("Error sending serial data!")
             return
             
         # Wait for any response
@@ -165,11 +166,11 @@ class SerialThrd (threading.Thread):
         super(SerialThrd, self).__init__()
 
         self.__reader_q = reader_q
-        self.__writer_q = Writer_q
+        self.__writer_q = writer_q
         self.__terminate = False
         self.__ser = None
-        self.__data = bytearray(100)
-        self.__resp_data
+        self.__data = bytearray()
+        self.__resp_data = None
     
     #-------------------------------------------------
     # Terminate thread
@@ -196,7 +197,7 @@ class SerialThrd (threading.Thread):
         
         # Open local serial port
         # Temp connect data
-        data = [{"port": "COM1", "baud": 9600, "data_bits": 8, "parity": "N", "stop_bits": 2}]
+        data = [{"port": "COM3", "baud": 9600, "data_bits": 8, "parity": "N", "stop_bits": 2}]
         # Open local port
         self.__do_connect(data);
             
@@ -215,7 +216,7 @@ class SerialThrd (threading.Thread):
                     
         # Terminating
         self.__do_disconnect()
-        print("Serial Server client - Serial thread terminating...")
+        print("Serial Client - Serial thread exiting...")
                 
     #-------------------------------------------------
     # Connect to serial port    
@@ -227,8 +228,8 @@ class SerialThrd (threading.Thread):
         try:
             self.__ser = serial.Serial( port=p["port"],
                                         baudrate=p["baud"],
-                                        bytesize=p[data_bits],
-                                        parity=p[[parity],
+                                        bytesize=p["data_bits"],
+                                        parity=p["parity"],
                                         stopbits=p["stop_bits"],
                                         timeout=0.5,
                                         xonxoff=0,
@@ -236,9 +237,6 @@ class SerialThrd (threading.Thread):
                                         write_timeout=0.5)
         except serial.SerialException:
             print("Failed to open device %s!", p["port"])
-            return False
-        except serial.ValueException:
-            print("Parameter error in serial port %s parameters!", p["port"])
             return False
         return True    
     
@@ -271,18 +269,16 @@ class SerialThrd (threading.Thread):
     # Read response data
     def __read_data(self):
        
-        i = 0
         while True:
             try:
-                self.__data[i] = self.__ser.read(1)
-                i += 1
+                self.__data.append (self.__ser.read(1))
             except serial.SerialTimeoutException:
                 # This is not an error as we don't know how many bytes to expect
                 # Therefore a timeout signals the end of the data
                 break
         
         # Return size of response data   
-        return i
+        return len(self.__data)
     
     #-------------------------------------------------
     # Dispatch data
@@ -334,15 +330,16 @@ class SerialClient:
         """
         
         # Start the threads
-        self.__udp_thread = UDPThread(self.__to_udp, self.__to_serial)
+        self.__udp_thread = UDPThrd(self.__to_udp, self.__to_serial)
         self.__udp_thread.start()
-        self.__serial_thread = UDPThread(self.__to_serial, self.__to_udp)
+        self.__serial_thread = SerialThrd(self.__to_serial, self.__to_udp)
         self.__serial_thread.start()
         
+        print ("Serial Client running...")
         # Wait for exit
         while True:
             try:
-                time.sleep(1)
+                sleep(1)
             except KeyboardInterrupt:
                 break
         
@@ -352,7 +349,7 @@ class SerialClient:
         self.__serial_thread.terminate()
         self.__serial_thread.join()
         
-        print("Serial Server Client exiting...")        
+        print("Serial Client exiting...")        
 
 #=====================================================
 # Entry point
