@@ -92,9 +92,11 @@ class UDPThrd (threading.Thread):
     def run(self):
         """ Listen for events """
         
+            # Temp connect data
+            data = [{"port": "COM1", "baud": 9600, "data_bits": 8, "parity": "N", "stop_bits": 2}]
+            # Open remote port
             try:
                 # Send connect data to the remote device
-                data = [{"port": "COM1", "baud": 9600, "data_bits": 8, "parity": "N", "stop_bits": 2}]
                 self.__sock.send(pickle.dump({"reqst": "connect", "data": data}, self.__addr)
             except socket.timeout:
                 print "Error sending connect data!"
@@ -103,6 +105,13 @@ class UDPThrd (threading.Thread):
             # Processing loop
             while not self.__terminate:
                 self.__process()
+                
+            try:
+                self.__sock.send(pickle.dump({"reqst": "disconnect", "data": []}, self.__addr)
+            except socket.timeout:
+                print "Error disconnecting!"
+                
+            print ("Serial Server client UDP thread exiting...")
 
     #-------------------------------------------------
     # Process exchanges
@@ -127,12 +136,13 @@ class UDPThrd (threading.Thread):
         try:
             data, self.__addr = self.__sock.recvfrom(100)
         except socket.timeout:
-            # No response
+            # No response is not an error
             return
         
         # Dispatch to serial
         d = pickle.loads(data)
         if d["resp"]:
+            # Good response
             self.__writer_q.put(d["data"])
             
 #=====================================================
@@ -171,13 +181,24 @@ class SerialThrd (threading.Thread):
     # Thread entry point    
     def run(self):
         """
-        Wait for data from q:
+        Open port
+        Wait for data from serial port.
+        Send data to writer q
+        Wait for response data from reader q
+        Send response data to serial port
+        
         Format for requests is:
             {"rqst":rqst_type, "data":[parameters or data]}
             reqst_type : "connect", "disconnect", "serial_data"
         
         """
         
+        # Open local serial port
+        # Temp connect data
+        data = [{"port": "COM1", "baud": 9600, "data_bits": 8, "parity": "N", "stop_bits": 2}]
+        # Open local port
+        self.__do_connect(data);
+            
         # Outer loop
         while not self.__terminate:
             # Wait for the connect data
