@@ -128,7 +128,7 @@ class UDPThrd (threading.Thread):
         
         # Dispatch data
         try:
-            self.__sock.send(pickle.dump({"reqst": "data", "data": data}, self.__addr))
+            self.__sock.sendto(pickle.dumps({"reqst": "data", "data": data}), self.__addr)
         except socket.timeout:
             print ("Error sending serial data!")
             return
@@ -169,7 +169,7 @@ class SerialThrd (threading.Thread):
         self.__writer_q = writer_q
         self.__terminate = False
         self.__ser = None
-        self.__data = bytearray()
+        self.__data = []
         self.__resp_data = None
     
     #-------------------------------------------------
@@ -204,11 +204,11 @@ class SerialThrd (threading.Thread):
         # Main thread loop            
         while not self.__terminate:
             # Read data from serial port
-            n = self.__read_data()
-            if n > 0:
+            data = self.__read_data()
+            if len(data) > 0:
                 # Have some data
                 # Dispatch to UDP
-                self.__dispatch_data(n)
+                self.__dispatch_data(data)
                 # Wait for response
                 if self.__response_data():
                     # We have response data
@@ -242,7 +242,7 @@ class SerialThrd (threading.Thread):
     
     #-------------------------------------------------
     # Disconnect from serial port    
-    def __do_disconnect():
+    def __do_disconnect(self):
         
         self.__ser.close()
         return True
@@ -268,25 +268,27 @@ class SerialThrd (threading.Thread):
     #-------------------------------------------------
     # Read response data
     def __read_data(self):
-       
+
+        data = []      
         while True:
             try:
-                self.__data.append (self.__ser.read(1))
+                data.append(self.__ser.read(1))
+                if data[-1] == b'':
+                    break
             except serial.SerialTimeoutException:
                 # This is not an error as we don't know how many bytes to expect
                 # Therefore a timeout signals the end of the data
                 break
         
-        # Return size of response data   
-        return len(self.__data)
+        # Return as a byte array  
+        return data
     
     #-------------------------------------------------
     # Dispatch data
-    def __dispatch_data(self, size):
+    def __dispatch_data(self, data):
        
-        actual_data = self.__data[:size]
         try:
-            self.__writer_q.put(actual_data, timeout=0.1)
+            self.__writer_q.put(data, timeout=0.1)
         except queue.Full:
             print("Exception queue full writing data!")
             return False
@@ -298,7 +300,7 @@ class SerialThrd (threading.Thread):
     
         try:
             self.__resp_data = self.__reader_q.get(timeout=0.1)
-        except Queue.Empty:
+        except queue.Empty:
             return False
         return True
     
@@ -349,7 +351,8 @@ class SerialClient:
         self.__serial_thread.terminate()
         self.__serial_thread.join()
         
-        print("Serial Client exiting...")        
+        print("Serial Client exiting...")
+        return 0
 
 #=====================================================
 # Entry point
