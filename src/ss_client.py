@@ -213,7 +213,8 @@ class SerialThrd (threading.Thread):
                 # Wait for response
                 if self.__response_data():
                     # We have response data
-                    self.__write_data(self.__resp_data)
+                    byte_data = b''.join(self.__resp_data)
+                    self.__write_data(byte_data)
                     
         # Terminating
         self.__do_disconnect()
@@ -237,7 +238,7 @@ class SerialThrd (threading.Thread):
                                         rtscts=0,
                                         write_timeout=0.5)
         except serial.SerialException:
-            print("Failed to open device %s!", p["port"])
+            print("Failed to open device! ", p["port"])
             return False
         return True    
     

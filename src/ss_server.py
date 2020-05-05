@@ -191,7 +191,8 @@ class SerialThrd (threading.Thread):
                             print("Failed to disconnect from serial port!")
                             return
                     elif item["rqst"] == "data":
-                        if self.__write_data(item["data"]):
+                        byte_data = b''.join(item["data"])
+                        if self.__write_data(byte_data):
                             data = self.__read_data()
                             # There may be no response data so we can't treat it as an error
                             if len(data) > 0:
@@ -239,7 +240,7 @@ class SerialThrd (threading.Thread):
     #-------------------------------------------------
     # Write data to serial port 
     def __write_data(self, data):
-       
+        
         # Write data is a bytearray
         try:
             bytes_written = self.__ser.write(data)
