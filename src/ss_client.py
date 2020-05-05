@@ -143,9 +143,9 @@ class UDPThrd (threading.Thread):
         
         # Dispatch to serial
         d = pickle.loads(data)
-        if d["resp"]:
+        if d[0]["resp"]:
             # Good response
-            self.__writer_q.put(d["data"])
+            self.__writer_q.put(d[0]["data"])
             
 #=====================================================
 # Serial thread
@@ -213,7 +213,7 @@ class SerialThrd (threading.Thread):
                 # Wait for response
                 if self.__response_data():
                     # We have response data
-                    byte_data = b''.join(self.__resp_data)
+                    byte_data = b''.join(self.__resp_data[0])
                     self.__write_data(byte_data)
                     
         # Terminating
@@ -254,6 +254,7 @@ class SerialThrd (threading.Thread):
     def __write_data(self, data):
        
         # Write data is a bytearray
+        print("Client write: ", data)
         try:
             bytes_written = self.__ser.write(data)
         except serial.SerialTimeoutException:
@@ -282,6 +283,8 @@ class SerialThrd (threading.Thread):
                 # Therefore a timeout signals the end of the data
                 break
         if len(data) > 0:
+            if len(data) > 1:
+                print("Client read: ", data[:len(data)-1])
             return data[:len(data)-1]
         return data
         
