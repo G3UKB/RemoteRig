@@ -100,6 +100,7 @@ class UDPThrd (threading.Thread):
     def __process(self, data):
         # We simply dispatch data to the serial class instance
         # The client is responsible for proper formatting of the request
+        print(data)
         try:
             self.__writer_q.put(data, timeout=0.1)
         except queue.Full:
@@ -257,17 +258,19 @@ class SerialThrd (threading.Thread):
     # Read response data
     def __read_data(self):
        
-        self.__resp.clear()
+        data = []      
         while True:
             try:
-                self.__resp.append (self.__ser.read(1))
+                data.append(self.__ser.read(1))
+                if (data[-1] == b''):
+                    break
             except serial.SerialTimeoutException:
                 # This is not an error as we don't know how many bytes to expect
-                # Therefore a timeout signals the end of the response data
+                # Therefore a timeout signals the end of the data
                 break
-        
-        # Return data   
-        return self.__resp
+        if len(data) > 0:
+            return data[:len(data)-1]
+        return data
     
     #-------------------------------------------------
     # Dispatch data

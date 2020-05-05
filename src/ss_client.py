@@ -109,7 +109,7 @@ class UDPThrd (threading.Thread):
             self.__process()
             
         try:
-            self.__sock.sendto(pickle.dumps({"reqst": "disconnect", "data": []}), self.__addr)
+            self.__sock.sendto(pickle.dumps({"rqst": "disconnect", "data": []}), self.__addr)
         except socket.timeout:
             print ("Error disconnecting!")
             
@@ -274,16 +274,16 @@ class SerialThrd (threading.Thread):
         while True:
             try:
                 data.append(self.__ser.read(1))
-                if data[-1] == b'':
+                if (data[-1] == b''):
                     break
             except serial.SerialTimeoutException:
                 # This is not an error as we don't know how many bytes to expect
                 # Therefore a timeout signals the end of the data
                 break
-        
-        # Return as a byte array  
+        if len(data) > 0:
+            return data[:len(data)-1]
         return data
-    
+        
     #-------------------------------------------------
     # Dispatch data
     def __dispatch_data(self, data):
