@@ -74,7 +74,8 @@ class UDPThrd (threading.Thread):
         self.__writer_q = writer_q
         
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.__remote_ip = '192.168.1.110'
+        #self.__remote_ip = '192.168.1.110'
+        self.__remote_ip = 'localhost'
         self.__remote_port = 10001
         self.__addr = (self.__remote_ip, self.__remote_port)
         self.__sock.settimeout(3)
@@ -98,7 +99,7 @@ class UDPThrd (threading.Thread):
         # Open remote port
         try:
             # Send connect data to the remote device
-            self.__sock.sendto(pickle.dumps({"reqst": "connect", "data": data}), self.__addr)
+            self.__sock.sendto(pickle.dumps({"rqst": "connect", "data": data}), self.__addr)
         except socket.timeout:
             print ("Error sending connect data!")
             return
@@ -128,7 +129,7 @@ class UDPThrd (threading.Thread):
         
         # Dispatch data
         try:
-            self.__sock.sendto(pickle.dumps({"reqst": "data", "data": data}), self.__addr)
+            self.__sock.sendto(pickle.dumps({"rqst": "data", "data": data}), self.__addr)
         except socket.timeout:
             print ("Error sending serial data!")
             return
