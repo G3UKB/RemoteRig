@@ -78,7 +78,7 @@ class UDPThrd (threading.Thread):
         self.__remote_ip = 'localhost'
         self.__remote_port = 10001
         self.__addr = (self.__remote_ip, self.__remote_port)
-        self.__sock.settimeout(3)
+        self.__sock.settimeout(1)
         
         self.__terminate = False
     
@@ -133,12 +133,22 @@ class UDPThrd (threading.Thread):
         except socket.timeout:
             print ("Error sending UDP data!")
             return
-            
+        
+        l = [0x01,0x42,0x34,0x56,0x01]
+        #res = ''.join(format(x, '02x') for x in list)
+        #print(l)
+        self.__writer_q.put([l])
+        return
+        
         # Wait for any response
         try:
             data, self.__addr = self.__sock.recvfrom(100)
         except socket.timeout:
             # No response is not an error
+            return
+        except socket.error as err:
+            print("Socket error: {0}".format(err))
+            # Probably not connected
             return
         
         # Dispatch to serial
@@ -233,10 +243,10 @@ class SerialThrd (threading.Thread):
                                         bytesize=p["data_bits"],
                                         parity=p["parity"],
                                         stopbits=p["stop_bits"],
-                                        timeout=0.5,
+                                        timeout=0.05,
                                         xonxoff=0,
                                         rtscts=0,
-                                        write_timeout=0.5)
+                                        write_timeout=0.05)
         except serial.SerialException:
             print("Failed to open device! ", p["port"])
             return False
@@ -251,7 +261,7 @@ class SerialThrd (threading.Thread):
     
     #-------------------------------------------------
     # Write data to serial port 
-    def __write_data(self, data):
+    def __write_data_sav(self, data):
        
         # Write data is a bytearray
         print("Client write: ", data)
@@ -267,7 +277,20 @@ class SerialThrd (threading.Thread):
         else:
             print ("Failed to write all serial data. Buffer %d, written %d!", len(data), bytes_written)
             return False
-            
+    
+    def __write_data(self, data):
+       
+        # Write data is a bytearray
+        print("Client write: ", data)
+        try:
+            for d in data:
+                self.__ser.write(d)
+        except serial.SerialTimeoutException:
+            print ("Timeout writing serial data. Bytes written %d!", bytes_written)
+            return False
+        
+        return True
+        
     #-------------------------------------------------
     # Read response data
     def __read_data_sav(self):
@@ -292,14 +315,22 @@ class SerialThrd (threading.Thread):
     # Read response data
     def __read_data(self):
       
+        data = []
         while True:
+            if self.__terminate:
+                return b''    
             try:
                 # Data length should never exceed 50 bytes
-                data = self.__ser.read(50)
+                data.append(self.__ser.read(1))
                 # Returns on 50 chars or on timeout
-                if len(data) > 0:
-                    print("Client read: ", data)
-                    break
+                if data[-1] == b'':
+                    if len(data) > 1:
+                        print("Client read: ", data[:len(data)-1])
+                        return data[:len(data)-1]
+                    else:
+                        data.clear()
+                        continue
+                
             except serial.SerialTimeoutException:
                 # This is not an error as we don't know how many bytes to expect
                 # Therefore a timeout signals the end of the data

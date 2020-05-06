@@ -218,10 +218,10 @@ class SerialThrd (threading.Thread):
                                         bytesize=p["data_bits"],
                                         parity=p["parity"],
                                         stopbits=p["stop_bits"],
-                                        timeout=0.5,
+                                        timeout=0.1,
                                         xonxoff=0,
                                         rtscts=0,
-                                        write_timeout=0.5)
+                                        write_timeout=0.1)
         except serial.SerialException:
             print("Serial Server - Failed to open device %s!", p["port"])
             return False
@@ -239,7 +239,7 @@ class SerialThrd (threading.Thread):
     
     #-------------------------------------------------
     # Write data to serial port 
-    def __write_data(self, data):
+    def __write_data_sav(self, data):
         
         # Write data is a bytearray
         print("Server write: ", data)
@@ -255,7 +255,19 @@ class SerialThrd (threading.Thread):
         else:
             print ("Failed to write all serial data. Buffer %d, written %d!", len(data), bytes_written)
             return False
-            
+    
+    def __write_data(self, data):
+       
+        print("Server write: ", data)
+        try:
+            for d in data:
+                self.__ser.write(d)
+        except serial.SerialTimeoutException:
+            print ("Timeout writing serial data. Bytes written %d!", bytes_written)
+            return False
+        
+        return True
+    
     #-------------------------------------------------
     # Read response data
     def __read_data_sav(self):
@@ -276,9 +288,32 @@ class SerialThrd (threading.Thread):
             return data[:len(data)-1]
         return data
     
+    def __read_data(self):
+      
+        data = []
+        while True:
+            if self.__terminate:
+                return b''    
+            try:
+                # Data length should never exceed 50 bytes
+                data.append(self.__ser.read(1))
+                # Returns on timeout
+                if data[-1] == b'':
+                    break
+                
+            except serial.SerialTimeoutException:
+                # This is not an error as we don't know how many bytes to expect
+                # Therefore a timeout signals the end of the data
+                print("Server timeout: ", data)
+                break
+        if len(data) > 0:
+            data = data[:len(data)-1]
+        print("Server read: ", data)
+        return data
+    
     #-------------------------------------------------
     # Read response data
-    def __read_data(self):
+    def __read_data_sav1(self):
       
         try:
             # Data length should never exceed 50 bytes
