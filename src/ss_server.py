@@ -103,7 +103,7 @@ class UDPThrd (threading.Thread):
         try:
             self.__writer_q.put(data, timeout=0.1)
         except queue.Full:
-            print("Exception queue full writing request data!")
+            print("Serial Server - queue full writing request data!")
             return False
         
         # Wait for any response
@@ -169,7 +169,7 @@ class SerialThrd (threading.Thread):
                         if self.__do_connect(item["data"]):
                             break
                         else:
-                            print("Failed to connect to serial port!")
+                            print("Serial Server - Failed to connect to serial port!")
                             return
                     else:
                         continue
@@ -187,18 +187,19 @@ class SerialThrd (threading.Thread):
                         if self.__do_disconnect():
                             break
                         else:
-                            print("Failed to disconnect from serial port!")
+                            print("Serial Server - Failed to disconnect from serial port!")
                             return
                     elif item["rqst"] == "data":
-                        byte_data = b''.join(item["data"])
-                        if self.__write_data(byte_data):
+                        #byte_data = b''.join(item["data"])
+                        #if self.__write_data(byte_data):
+                        if self.__write_data(item["data"]):
                             data = self.__read_data()
                             # There may be no response data so we can't treat it as an error
                             if len(data) > 0:
                                 self.__dispatch_data(data)
                             continue
                         else:
-                            print("Failed to write [all] data to serial port! Attempting to continue.")
+                            print("Serial Server - Failed to write [all] data to serial port! Attempting to continue.")
                             continue
                 except queue.Empty:
                     continue
@@ -222,10 +223,10 @@ class SerialThrd (threading.Thread):
                                         rtscts=0,
                                         write_timeout=0.5)
         except serial.SerialException:
-            print("Failed to open device %s!", p["port"])
+            print("Serial Server - Failed to open device %s!", p["port"])
             return False
         except serial.ValueException:
-            print("Parameter error in serial port %s parameters!", p["port"])
+            print("Serial Server - Parameter error in serial port %s parameters!", p["port"])
             return False
         return True    
     
@@ -257,7 +258,7 @@ class SerialThrd (threading.Thread):
             
     #-------------------------------------------------
     # Read response data
-    def __read_data(self):
+    def __read_data_sav(self):
        
         data = []      
         while True:
@@ -276,13 +277,28 @@ class SerialThrd (threading.Thread):
         return data
     
     #-------------------------------------------------
+    # Read response data
+    def __read_data(self):
+      
+        try:
+            # Data length should never exceed 50 bytes
+            data = self.__ser.read(50)
+            print("Server read: ", data)
+        except serial.SerialTimeoutException:
+            # This is not an error as we don't know how many bytes to expect
+            # Therefore a timeout signals the end of the data
+            print("Serial Server - timeout: ", data)
+        
+        return data
+    
+    #-------------------------------------------------
     # Dispatch data
     def __dispatch_data(self, data):
        
         try:
             self.__writer_q.put(data, timeout=0.1)
         except queue.Full:
-            print("Exception queue full writing response data!")
+            print("Serial Server -  queue full writing response data!")
             return False
         return True
     

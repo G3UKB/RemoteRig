@@ -131,7 +131,7 @@ class UDPThrd (threading.Thread):
         try:
             self.__sock.sendto(pickle.dumps({"rqst": "data", "data": data}), self.__addr)
         except socket.timeout:
-            print ("Error sending serial data!")
+            print ("Error sending UDP data!")
             return
             
         # Wait for any response
@@ -213,8 +213,8 @@ class SerialThrd (threading.Thread):
                 # Wait for response
                 if self.__response_data():
                     # We have response data
-                    byte_data = b''.join(self.__resp_data[0])
-                    self.__write_data(byte_data)
+                    #byte_data = b''.join(self.__resp_data[0])
+                    self.__write_data(self.__resp_data[0])
                     
         # Terminating
         self.__do_disconnect()
@@ -270,7 +270,7 @@ class SerialThrd (threading.Thread):
             
     #-------------------------------------------------
     # Read response data
-    def __read_data(self):
+    def __read_data_sav(self):
 
         data = []      
         while True:
@@ -287,7 +287,27 @@ class SerialThrd (threading.Thread):
                 print("Client read: ", data[:len(data)-1])
             return data[:len(data)-1]
         return data
+    
+    #-------------------------------------------------
+    # Read response data
+    def __read_data(self):
+      
+        while True:
+            try:
+                # Data length should never exceed 50 bytes
+                data = self.__ser.read(50)
+                # Returns on 50 chars or on timeout
+                if len(data) > 0:
+                    print("Client read: ", data)
+                    break
+            except serial.SerialTimeoutException:
+                # This is not an error as we don't know how many bytes to expect
+                # Therefore a timeout signals the end of the data
+                print("Client timeout: ", data)
+                break
         
+        return data
+    
     #-------------------------------------------------
     # Dispatch data
     def __dispatch_data(self, data):
@@ -295,7 +315,7 @@ class SerialThrd (threading.Thread):
         try:
             self.__writer_q.put(data, timeout=0.1)
         except queue.Full:
-            print("Exception queue full writing data!")
+            print("Client - queue full writing data!")
             return False
         return True
     
