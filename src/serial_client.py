@@ -48,6 +48,75 @@ The client consists of two threads:
 """
 
 #=====================================================
+# Reader thread
+#===================================================== 
+class ReaderThrd (threading.Thread):
+    
+    #-------------------------------------------------
+    # Initialisation
+    def __init__(self, port):
+        """
+        Constructor
+        
+        Arguments
+            
+        """
+
+        super(ReaderThrd, self).__init__()
+        
+        self.__ser_port = port
+        
+        self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        #self.__remote_ip = '192.168.1.110'
+        self.__remote_ip = 'localhost'
+        self.__remote_port = 10001
+        self.__addr = (self.__remote_ip, self.__remote_port)
+        self.__sock.settimeout(1)
+        
+        self.__terminate = False
+    
+    #-------------------------------------------------
+    # Terminate thread
+    def terminate(self):
+        """ Terminate thread """
+        
+        self.__terminate = True
+    
+    #-------------------------------------------------
+    # Thread entry point    
+    def run(self):
+        """ Listen for events """
+
+        # Processing loop
+        while not self.__terminate:
+            self.__process()
+            
+        print ("Serial Client - Reader thread exiting...")
+
+    #-------------------------------------------------
+    # Process exchanges
+    def __process(self):
+        # We wait for 1 byte of data from the serial class instance
+        # Send byte immediately to the server
+        
+        # Read 1 byte
+        try:
+            data = self.__ser_port.read(1)
+            if data == b'':
+                # Timeout seems to return an empty bytes object
+                return 
+        except serial.SerialTimeoutException:
+            # I guess we could get a timeout as well
+            return
+        
+        # Dispatch to server
+        try:
+            self.__sock.sendto(data, self.__addr)
+        except socket.timeout:
+            print ("Error sending UDP data!")
+            return
+
+#=====================================================
 # Writer thread
 #===================================================== 
 class WriterThrd (threading.Thread):
@@ -93,75 +162,6 @@ class WriterThrd (threading.Thread):
             self.__process()
             
         print ("Serial Client - Writer thread exiting...")
-
-    #-------------------------------------------------
-    # Process exchanges
-    def __process(self):
-        # We wait for 1 byte of data from the serial class instance
-        # Send byte immediately to the server
-        
-        # Read 1 byte
-        try:
-            data = self.__ser_port.read(1)
-            if data == b'':
-                # Timeout seems to return an empty bytes object
-                return 
-        except serial.SerialTimeoutException:
-            # I guess we could get a timeout as well
-            return
-        
-        # Dispatch to server
-        try:
-            self.__sock.sendto(data, self.__addr)
-        except socket.timeout:
-            print ("Error sending UDP data!")
-            return
-
-#=====================================================
-# Reader thread
-#===================================================== 
-class ReaderThrd (threading.Thread):
-    
-    #-------------------------------------------------
-    # Initialisation
-    def __init__(self, port):
-        """
-        Constructor
-        
-        Arguments
-            
-        """
-
-        super(ReaderThrd, self).__init__()
-        
-        self.__ser_port = port
-        
-        self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #self.__remote_ip = '192.168.1.110'
-        self.__remote_ip = 'localhost'
-        self.__remote_port = 10001
-        self.__addr = (self.__remote_ip, self.__remote_port)
-        self.__sock.settimeout(1)
-        
-        self.__terminate = False
-    
-    #-------------------------------------------------
-    # Terminate thread
-    def terminate(self):
-        """ Terminate thread """
-        
-        self.__terminate = True
-    
-    #-------------------------------------------------
-    # Thread entry point    
-    def run(self):
-        """ Listen for events """
-
-        # Processing loop
-        while not self.__terminate:
-            self.__process()
-            
-        print ("Serial Client - Reader thread exiting...")
 
     #-------------------------------------------------
     # Process exchanges

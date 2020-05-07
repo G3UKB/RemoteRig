@@ -97,7 +97,7 @@ class ReaderThrd (threading.Thread):
     # Process exchanges
     def __process(self):
         # We wait for 1 byte of data from the serial class instance
-        # Send byte immediately to the server
+        # Send byte immediately to the client
         
         # Read 1 byte
         try:
