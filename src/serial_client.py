@@ -42,19 +42,19 @@ import queue
 import pickle
 
 """
-The server consists of two threads:
-    The outgoing and incoming threads.
+The client consists of two threads:
+    The reader and writer threads.
         and a control class responsible for startup/shutdown.
 """
 
 #=====================================================
-# Reader thread
+# Writer thread
 #===================================================== 
-class ReaderThrd (threading.Thread):
+class WriterThrd (threading.Thread):
     
     #-------------------------------------------------
     # Initialisation
-    def __init__(self):
+    def __init__(self, port):
         """
         Constructor
         
@@ -62,7 +62,9 @@ class ReaderThrd (threading.Thread):
             
         """
 
-        super(ReaderThrd, self).__init__()
+        super(WriterThrd, self).__init__()
+        
+        self.__ser_port = port
         
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         #self.__remote_ip = '192.168.1.110'
@@ -89,7 +91,7 @@ class ReaderThrd (threading.Thread):
         while not self.__terminate:
             self.__process()
             
-        print ("Serial Client - Reader thread exiting...")
+        print ("Serial Server - Writer thread exiting...")
 
     #-------------------------------------------------
     # Process exchanges
@@ -99,7 +101,7 @@ class ReaderThrd (threading.Thread):
         
         # Read 1 byte
         try:
-            data = self.__ser.read(1)
+            data = self.__ser_port.read(1)
             if data == b'':
                 # Timeout seems to return an empty bytes object
                 return 
@@ -115,13 +117,13 @@ class ReaderThrd (threading.Thread):
             return
 
 #=====================================================
-# Writer thread
+# Reader thread
 #===================================================== 
-class WriterThrd (threading.Thread):
+class ReaderThrd (threading.Thread):
     
     #-------------------------------------------------
     # Initialisation
-    def __init__(self):
+    def __init__(self, port):
         """
         Constructor
         
@@ -129,7 +131,9 @@ class WriterThrd (threading.Thread):
             
         """
 
-        super(WriterThrd, self).__init__()
+        super(ReaderThrd, self).__init__()
+        
+        self.__ser_port = port
         
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         #self.__remote_ip = '192.168.1.110'
@@ -157,7 +161,7 @@ class WriterThrd (threading.Thread):
         while not self.__terminate:
             self.__process()
             
-        print ("Serial Client - Writer thread exiting...")
+        print ("Serial Server - Reader thread exiting...")
 
     #-------------------------------------------------
     # Process exchanges
@@ -178,7 +182,7 @@ class WriterThrd (threading.Thread):
 
         # Write data to serial port
         try:
-            self.__ser.write(data) 
+            self.__ser_port.write(data) 
         except serial.SerialTimeoutException:
             # I guess we could get a timeout as well
             pass
@@ -214,12 +218,10 @@ class SerialClient:
         addr = (self.__remote_ip, self.__remote_port)
         settimeout(1)
         
-        print ("Serial Client running...")
+        print ("Serial Server running...")
         
-        # Initialise the server
-        # Temp connect data
-        connect_data = [{"port": "COM4", "baud": 9600, "data_bits": 8, "parity": "N", "stop_bits": 2}]
-        # Open remote port
+        # Wait for initialisation data
+        # Open local port
         try:
             # Send connect data to the remote device
             sock.sendto(pickle.dumps({"rqst": "connect", "data": [connect_data]}), self.__addr)
@@ -231,9 +233,9 @@ class SerialClient:
         self.__do_connect(connect_data)
         
         # Start the threads
-        reader_thread = ReaderThrd()
+        reader_thread = ReaderThrd(self.__ser)
         reader_thread.start()
-        writer_thread = WriterThrd()
+        writer_thread = WriterThrd(self.__ser)
         writer_thread.start()
         
         # Wait for exit
