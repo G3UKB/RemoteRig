@@ -213,7 +213,8 @@ class SerialClient:
             print ("Failed to read 'serial.conf', please create and try again!")
             return 0
         # Assemble params into logical structures
-        self.__assemble_params(params)
+        if not self.__assemble_params(config):
+            return 0
         
         # Create local control socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -223,7 +224,7 @@ class SerialClient:
         # Send initialisation data to server
         try:
             # Send connect data to the remote device
-            sock.sendto(pickle.dumps({"rqst": "connect", "data": {'network': self.__net_p['serverport'], 'serial': self.__svr_p}}), addr)
+            sock.sendto(pickle.dumps({"rqst": "connect", "data": {'net': [self.__net_p['serverport'], self.__net_p['localport']], 'serial': self.__svr_p}}), addr)
         except socket.timeout:
             print ("Error sending connect request!")
             return 0
@@ -265,20 +266,20 @@ class SerialClient:
 
     #-------------------------------------------------
     # Connect to serial port    
-    def __assemble_params(self, c) {
+    def __assemble_params(self, c):
         
         # Check we have the required sections
-        if not 'network' c.sections:
-            print "Missing 'network' section in configuration!"
+        if not 'network' in c:
+            print ("Missing 'network' section in configuration!")
             return False
-        if not 'serialports' c.sections:
-            print "Missing 'serialports' section in configuration!"
+        if not 'serialports' in c:
+            print ("Missing 'serialports' section in configuration!")
             return False
-        if not 'cliparams' c.sections:
-            print "Missing 'cliparams' section in configuration!"
+        if not 'cliparams' in c:
+            print ("Missing 'cliparams' section in configuration!")
             return False
-        if not 'svrparams' c.sections:
-            print "Missing 'svrparams' section in configuration!"
+        if not 'svrparams' in c:
+            print ("Missing 'svrparams' section in configuration!")
             return False
         
         # Assemble parameters into dictionaries
@@ -295,7 +296,7 @@ class SerialClient:
         # Collect params into dictionaries
         try:
             # Network
-            self.__net_p['serverip'] = s1['server']
+            self.__net_p['serverip'] = s1['serverip']
             self.__net_p['controlport'] = int(s1['controlport'])
             self.__net_p['serverport'] = int(s1['serverport'])                                            
             self.__net_p['localport'] = int(s1['localport'])
@@ -303,29 +304,26 @@ class SerialClient:
             # Serial
             self.__cli_p['port'] = s2['client']
             self.__svr_p['port'] = s2['server']
-            self.__cli_p['baud'] = s3['baudrate']
-            self.__svr_p['baud'] = s4['baudrate']
-            self.__cli_p['databits'] = s3['databits']
-            self.__svr_p['databits'] = s4['databits']
+            self.__cli_p['baud'] = int(s3['baudrate'])
+            self.__svr_p['baud'] = int(s4['baudrate'])
+            self.__cli_p['databits'] = int(s3['databits'])
+            self.__svr_p['databits'] = int(s4['databits'])
             self.__cli_p['parity'] = s3['parity']
             self.__svr_p['parity'] = s4['parity']
-            self.__cli_p['stopbits'] = s3['stopbits']
-            self.__svr_p['stopbits'] = s4['stopbits']
-            self.__cli_p['readimeout'] = s3['readimeout']
-            self.__svr_p['readimeout'] = s4['readimeout']
-            self.__cli_p['readimeout'] = s3['readimeout']
-            self.__svr_p['readimeout'] = s4['readimeout']
-            self.__cli_p['writetimeout'] = s3['writetimeout']
-            self.__svr_p['writetimeout'] = s4['writetimeout']
-            self.__cli_p['xonxoff'] = s3['xonxoff']
-            self.__svr_p['xonxoff'] = s4['xonxoff']
-            self.__cli_p['rtscts'] = s3['rtscts']
-            self.__svr_p['rtscts'] = s4['rtscts']
+            self.__cli_p['stopbits'] = int(s3['stopbits'])
+            self.__svr_p['stopbits'] = int(s4['stopbits'])
+            self.__cli_p['readtimeout'] = float(s3['readtimeout'])
+            self.__svr_p['readtimeout'] = float(s4['readtimeout'])
+            self.__cli_p['writetimeout'] = float(s3['writetimeout'])
+            self.__svr_p['writetimeout'] = float(s4['writetimeout'])
+            self.__cli_p['xonxoff'] = int(s3['xonxoff'])
+            self.__svr_p['xonxoff'] = int(s4['xonxoff'])
+            self.__cli_p['rtscts'] = int(s3['rtscts'])
+            self.__svr_p['rtscts'] = int(s4['rtscts'])
         except KeyError as k:
             print ("Missing: %s from configuration!" % k)
             return False
         return True
-    }
 
     #-------------------------------------------------
     # Connect to serial port    
@@ -334,13 +332,13 @@ class SerialClient:
         try:
             self.__ser = serial.Serial( port=p["port"],
                                         baudrate=p["baud"],
-                                        bytesize=p["data_bits"],
+                                        bytesize=p["databits"],
                                         parity=p["parity"],
                                         stopbits=p["stopbits"],
                                         timeout=p["readtimeout"],
                                         xonxoff=p["xonxoff"],
                                         rtscts=p["rtscts"],
-                                        write_timeout=p["writetimeout"]
+                                        write_timeout=p["writetimeout"])
         except serial.SerialException:
             print("Failed to open device! ", p["port"])
             return False

@@ -54,7 +54,7 @@ class ReaderThrd (threading.Thread):
     
     #-------------------------------------------------
     # Initialisation
-    def __init__(self, client_addr, serial_port):
+    def __init__(self, client_ip, client_port, serial_port):
         """
         Constructor
         
@@ -67,7 +67,9 @@ class ReaderThrd (threading.Thread):
         self.__ser_port = serial_port
         
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.__addr = client_addr
+        #self.__addr = client_addr
+        self.__addr = (client_ip, client_port)
+        print(self.__addr)
         self.__sock.settimeout(1)
         
         self.__terminate = False
@@ -241,9 +243,9 @@ class SerialClient:
             return 0
         
         # Start the threads
-        reader_thread = ReaderThrd(client_addr, self.__ser)
+        reader_thread = ReaderThrd(client_addr[0], data["data"]["net"][1], self.__ser)
         reader_thread.start()
-        writer_thread = WriterThrd(self.__localip, data["data"]["net"], self.__ser)
+        writer_thread = WriterThrd(self.__localip, data["data"]["net"][0], self.__ser)
         writer_thread.start()
         
         print ("Serial Server running...")
@@ -280,13 +282,13 @@ class SerialClient:
         try:
             self.__ser = serial.Serial( port=p["port"],
                                         baudrate=p["baud"],
-                                        bytesize=p["data_bits"],
+                                        bytesize=p["databits"],
                                         parity=p["parity"],
                                         stopbits=p["stopbits"],
                                         timeout=p["readtimeout"],
                                         xonxoff=p["xonxoff"],
                                         rtscts=p["rtscts"],
-                                        write_timeout=p["writetimeout"]
+                                        write_timeout=p["writetimeout"])
         except serial.SerialException:
             print("Failed to open device! ", p["port"])
             return False
