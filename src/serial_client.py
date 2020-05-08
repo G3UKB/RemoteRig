@@ -223,7 +223,7 @@ class SerialClient:
         # Send initialisation data to server
         try:
             # Send connect data to the remote device
-            sock.sendto(pickle.dumps({"rqst": "connect", "data": self.__svr_p)}, addr)
+            sock.sendto(pickle.dumps({"rqst": "connect", "data": {'network': self.__net_p['serverport'], 'serial': self.__svr_p}}), addr)
         except socket.timeout:
             print ("Error sending connect request!")
             return 0
@@ -297,9 +297,9 @@ class SerialClient:
             # Network
             self.__net_p['serverip'] = s1['server']
             self.__net_p['controlport'] = int(s1['controlport'])
-            self.__net_p['serverport'] = int(s1['remoteport'])                                            
+            self.__net_p['serverport'] = int(s1['serverport'])                                            
             self.__net_p['localport'] = int(s1['localport'])
-            self.__net_p['localip'] = socket.gethostbyname(socket.gethostname)
+            self.__net_p['localip'] = socket.gethostbyname(socket.gethostname())
             # Serial
             self.__cli_p['port'] = s2['client']
             self.__svr_p['port'] = s2['server']

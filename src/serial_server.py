@@ -54,7 +54,7 @@ class ReaderThrd (threading.Thread):
     
     #-------------------------------------------------
     # Initialisation
-    def __init__(self, port):
+    def __init__(self, client_addr, serial_port):
         """
         Constructor
         
@@ -64,13 +64,10 @@ class ReaderThrd (threading.Thread):
 
         super(ReaderThrd, self).__init__()
         
-        self.__ser_port = port
+        self.__ser_port = serial_port
         
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #self.__remote_ip = '192.168.1.110'
-        self.__remote_ip = 'localhost'
-        self.__remote_port = 10002
-        self.__addr = (self.__remote_ip, self.__remote_port)
+        self.__addr = client_addr
         self.__sock.settimeout(1)
         
         self.__terminate = False
@@ -126,7 +123,7 @@ class WriterThrd (threading.Thread):
     
     #-------------------------------------------------
     # Initialisation
-    def __init__(self, port):
+    def __init__(self, local_ip, local_port, serial_port):
         """
         Constructor
         
@@ -136,13 +133,10 @@ class WriterThrd (threading.Thread):
 
         super(WriterThrd, self).__init__()
         
-        self.__ser_port = port
+        self.__ser_port = serial_port
         
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #self.__remote_ip = '192.168.1.110'
-        self.__remote_ip = 'localhost'
-        self.__remote_port = 10001
-        self.__addr = (self.__remote_ip, self.__remote_port)
+        self.__addr = (local_ip, local_port)
         self.__sock.bind(self.__addr)
         self.__sock.settimeout(1)
         
@@ -196,7 +190,7 @@ class WriterThrd (threading.Thread):
 class SerialClient: 
     #-------------------------------------------------
     # Initialisation
-    def __init__(self) :
+    def __init__(self, port) :
         """
         Constructor
         
@@ -204,6 +198,8 @@ class SerialClient:
             
         """
 
+        self.__control_port = port
+        
     #-------------------------------------------------
     # Main
     def main(self) :
@@ -214,21 +210,19 @@ class SerialClient:
             
         """
         
-        # Bind address is ours, control port must be fixed
-        # Host address we will get from the receive.
+        # Bind address is our ip, control port is provided in args
+        # Client address we get from the first receive.
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #self.__remote_ip = '192.168.1.110'
-        remote_ip = 'localhost'
-        remote_port = 10000
-        addr = (remote_ip, remote_port)
+        self.__localip = socket.gethostbyname(socket.gethostname())
+        addr = (self.__localip, self.__control_port)
         sock.bind(addr)
         sock.settimeout(1)
         
-        # Wait for connect data
+        # Wait for connect data on control port
         print ("Serial Server waiting for connect...")
         while True:
             try:
-                data, remote_addr = sock.recvfrom(512)
+                data, client_addr = sock.recvfrom(512)
                 break
             except socket.timeout:
                 continue
@@ -237,9 +231,9 @@ class SerialClient:
                 return 0
         data = pickle.loads(data)
         
-        # Open local port
+        # Open local serial port
         if data["rqst"] == "connect":
-            if not self.__do_connect(data["data"]):
+            if not self.__do_connect(data["data"]["serial"]):
                 print("Serial Server - Failed to connect to serial port!")
                 return 0
         else:
@@ -247,9 +241,9 @@ class SerialClient:
             return 0
         
         # Start the threads
-        reader_thread = ReaderThrd(self.__ser)
+        reader_thread = ReaderThrd(client_addr, self.__ser)
         reader_thread.start()
-        writer_thread = WriterThrd(self.__ser)
+        writer_thread = WriterThrd(self.__localip, data["data"]["net"], self.__ser)
         writer_thread.start()
         
         print ("Serial Server running...")
@@ -306,8 +300,12 @@ class SerialClient:
 #-------------------------------------------------
 # Start processing and wait for user to exit the application
 def main():
+    
+    if len(sys.argv) != 2:
+        print ("Please supply the control port number on the command line!")
+        return
     try:
-        app = SerialClient()
+        app = SerialClient(int(sys.argv[1]))
         sys.exit(app.main())
         
     except Exception as e:
