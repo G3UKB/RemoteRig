@@ -55,7 +55,7 @@ class ReaderThrd (threading.Thread):
     
     #-------------------------------------------------
     # Initialisation
-    def __init__(self, port):
+    def __init__(self, server_ip, server_port, serial_port):
         """
         Constructor
         
@@ -65,13 +65,10 @@ class ReaderThrd (threading.Thread):
 
         super(ReaderThrd, self).__init__()
         
-        self.__ser_port = port
+        self.__ser_port = serial_port
         
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #self.__remote_ip = '192.168.1.110'
-        self.__remote_ip = 'localhost'
-        self.__remote_port = 10001
-        self.__addr = (self.__remote_ip, self.__remote_port)
+        self.__addr = (server_ip, server_port)
         self.__sock.settimeout(1)
         
         self.__terminate = False
@@ -124,7 +121,7 @@ class WriterThrd (threading.Thread):
     
     #-------------------------------------------------
     # Initialisation
-    def __init__(self, port):
+    def __init__(self, local_ip, local_port, serial_port):
         """
         Constructor
         
@@ -134,13 +131,10 @@ class WriterThrd (threading.Thread):
 
         super(WriterThrd, self).__init__()
         
-        self.__ser_port = port
+        self.__ser_port = serial_port
         
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #self.__remote_ip = '192.168.1.110'
-        self.__remote_ip = 'localhost'
-        self.__remote_port = 10002
-        self.__addr = (self.__remote_ip, self.__remote_port)
+        self.__addr = (local_ip, local_port)
         self.__sock.bind(self.__addr)
         self.__sock.settimeout(1)
         
@@ -223,13 +217,13 @@ class SerialClient:
         
         # Create local control socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        addr = (self.__net_p['server'], self.__net_p['controlport'])
+        addr = (self.__net_p['serverip'], self.__net_p['controlport'])
         sock.settimeout(1)
         
         # Send initialisation data to server
         try:
             # Send connect data to the remote device
-            sock.sendto(pickle.dumps({"rqst": "connect", "data": self.__svr_p}), addr)
+            sock.sendto(pickle.dumps({"rqst": "connect", "data": self.__svr_p)}, addr)
         except socket.timeout:
             print ("Error sending connect request!")
             return 0
@@ -240,9 +234,9 @@ class SerialClient:
             return 0
         
         # Start the threads
-        reader_thread = ReaderThrd(self.__ser)
+        reader_thread = ReaderThrd(self.__net_p['serverip'], self.__net_p['serverport'], self.__ser)
         reader_thread.start()
-        writer_thread = WriterThrd(self.__ser)
+        writer_thread = WriterThrd(self.__net_p['localip'], self.__net_p['localport'], self.__ser)
         writer_thread.start()
         
         print ("Serial Client running...")
@@ -301,10 +295,11 @@ class SerialClient:
         # Collect params into dictionaries
         try:
             # Network
-            self.__net_p['server'] = s1['server']
+            self.__net_p['serverip'] = s1['server']
             self.__net_p['controlport'] = int(s1['controlport'])
-            self.__net_p['remoteport'] = int(s1['remoteport'])                                            
+            self.__net_p['serverport'] = int(s1['remoteport'])                                            
             self.__net_p['localport'] = int(s1['localport'])
+            self.__net_p['localip'] = socket.gethostbyname(socket.gethostname)
             # Serial
             self.__cli_p['port'] = s2['client']
             self.__svr_p['port'] = s2['server']
@@ -334,21 +329,20 @@ class SerialClient:
 
     #-------------------------------------------------
     # Connect to serial port    
-    def __do_connect(self, data):
-        # Connect data:
-        # {"port": d, "baud": b, "data_bits": b, "parity": p, "stop_bits": s}
+    def __do_connect(self, p):
+        # Connect data p:
         try:
-            self.__ser = serial.Serial( port=data["port"],
-                                        baudrate=data["baud"],
-                                        bytesize=data["data_bits"],
-                                        parity=data["parity"],
-                                        stopbits=data["stop_bits"],
-                                        timeout=0.05,
-                                        xonxoff=0,
-                                        rtscts=0,
-                                        write_timeout=0.05)
+            self.__ser = serial.Serial( port=p["port"],
+                                        baudrate=p["baud"],
+                                        bytesize=p["data_bits"],
+                                        parity=p["parity"],
+                                        stopbits=p["stopbits"],
+                                        timeout=p["readtimeout"],
+                                        xonxoff=p["xonxoff"],
+                                        rtscts=p["rtscts"],
+                                        write_timeout=p["writetimeout"]
         except serial.SerialException:
-            print("Failed to open device! ", data["port"])
+            print("Failed to open device! ", p["port"])
             return False
         return True    
     

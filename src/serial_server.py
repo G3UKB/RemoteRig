@@ -214,6 +214,8 @@ class SerialClient:
             
         """
         
+        # Bind address is ours, control port must be fixed
+        # Host address we will get from the receive.
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         #self.__remote_ip = '192.168.1.110'
         remote_ip = 'localhost'
@@ -233,7 +235,8 @@ class SerialClient:
             except KeyboardInterrupt:
                 print("Terminated by user...")
                 return 0
-        data = pickle.loads(data)    
+        data = pickle.loads(data)
+        
         # Open local port
         if data["rqst"] == "connect":
             if not self.__do_connect(data["data"]):
@@ -277,24 +280,24 @@ class SerialClient:
         return 0
 
     #-------------------------------------------------
-    # Connect to serial port    
-    def __do_connect(self, data):
-        # Connect data:
-        # {"port": d, "baud": b, "data_bits": b, "parity": p, "stop_bits": s}
+    # Connect to serial port        
+    def __do_connect(self, p):
+        # Connect data p:
         try:
-            self.__ser = serial.Serial( port=data["port"],
-                                        baudrate=data["baud"],
-                                        bytesize=data["data_bits"],
-                                        parity=data["parity"],
-                                        stopbits=data["stop_bits"],
-                                        timeout=0.05,
-                                        xonxoff=0,
-                                        rtscts=0,
-                                        write_timeout=0.05)
+            self.__ser = serial.Serial( port=p["port"],
+                                        baudrate=p["baud"],
+                                        bytesize=p["data_bits"],
+                                        parity=p["parity"],
+                                        stopbits=p["stopbits"],
+                                        timeout=p["readtimeout"],
+                                        xonxoff=p["xonxoff"],
+                                        rtscts=p["rtscts"],
+                                        write_timeout=p["writetimeout"]
         except serial.SerialException:
-            print("Failed to open device! ", data["port"])
+            print("Failed to open device! ", p["port"])
             return False
         return True    
+    
     
 #=====================================================
 # Entry point
