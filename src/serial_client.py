@@ -40,6 +40,7 @@ import socket
 import threading
 import queue
 import pickle
+import configparser
 
 """
 The client consists of two threads:
@@ -211,27 +212,30 @@ class SerialClient:
             
         """
         
+        # Get configuration data
+        config = configparser.ConfigParser()
+        params = config.read('serial.conf')
+        if len(params) == 0:
+            print ("Failed to read 'serial.conf', please create and try again!")
+            return 0
+        # Assemble params into logical structures
+        self.__assemble_params(params)
+        
+        # Create local control socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #self.__remote_ip = '192.168.1.110'
-        remote_ip = 'localhost'
-        remote_port = 10000
-        addr = (remote_ip, remote_port)
+        addr = (self.__net_p['server'], self.__net_p['controlport'])
         sock.settimeout(1)
         
-        # Send initialisation data
-        # Temp connect data
-        server_connect_data = {"port": "COM4", "baud": 9600, "data_bits": 8, "parity": "N", "stop_bits": 2}
+        # Send initialisation data to server
         try:
             # Send connect data to the remote device
-            sock.sendto(pickle.dumps({"rqst": "connect", "data": server_connect_data}), addr)
+            sock.sendto(pickle.dumps({"rqst": "connect", "data": self.__svr_p}), addr)
         except socket.timeout:
             print ("Error sending connect request!")
             return 0
         
-        # Open local port
-        # Temp connect data
-        client_connect_data = {"port": "COM3", "baud": 9600, "data_bits": 8, "parity": "N", "stop_bits": 2}
-        if not self.__do_connect(client_connect_data):
+        # Open local serial port
+        if not self.__do_connect(self.__cli_p):
             print("Serial Client - Failed to connect to serial port!")
             return 0
         
@@ -264,6 +268,69 @@ class SerialClient:
         
         print("Serial Client exiting...")
         return 0
+
+    #-------------------------------------------------
+    # Connect to serial port    
+    def __assemble_params(self, c) {
+        
+        # Check we have the required sections
+        if not 'network' c.sections:
+            print "Missing 'network' section in configuration!"
+            return False
+        if not 'serialports' c.sections:
+            print "Missing 'serialports' section in configuration!"
+            return False
+        if not 'cliparams' c.sections:
+            print "Missing 'cliparams' section in configuration!"
+            return False
+        if not 'svrparams' c.sections:
+            print "Missing 'svrparams' section in configuration!"
+            return False
+        
+        # Assemble parameters into dictionaries
+        self.__net_p = {}
+        self.__cli_p = {}
+        self.__svr_p = {}
+        
+        # Ref to the config sections
+        s1 = c['network']
+        s2 = c['serialports']
+        s3 = c['cliparams']
+        s4 = c['svrparams']
+        
+        # Collect params into dictionaries
+        try:
+            # Network
+            self.__net_p['server'] = s1['server']
+            self.__net_p['controlport'] = int(s1['controlport'])
+            self.__net_p['remoteport'] = int(s1['remoteport'])                                            
+            self.__net_p['localport'] = int(s1['localport'])
+            # Serial
+            self.__cli_p['port'] = s2['client']
+            self.__svr_p['port'] = s2['server']
+            self.__cli_p['baud'] = s3['baudrate']
+            self.__svr_p['baud'] = s4['baudrate']
+            self.__cli_p['databits'] = s3['databits']
+            self.__svr_p['databits'] = s4['databits']
+            self.__cli_p['parity'] = s3['parity']
+            self.__svr_p['parity'] = s4['parity']
+            self.__cli_p['stopbits'] = s3['stopbits']
+            self.__svr_p['stopbits'] = s4['stopbits']
+            self.__cli_p['readimeout'] = s3['readimeout']
+            self.__svr_p['readimeout'] = s4['readimeout']
+            self.__cli_p['readimeout'] = s3['readimeout']
+            self.__svr_p['readimeout'] = s4['readimeout']
+            self.__cli_p['writetimeout'] = s3['writetimeout']
+            self.__svr_p['writetimeout'] = s4['writetimeout']
+            self.__cli_p['xonxoff'] = s3['xonxoff']
+            self.__svr_p['xonxoff'] = s4['xonxoff']
+            self.__cli_p['rtscts'] = s3['rtscts']
+            self.__svr_p['rtscts'] = s4['rtscts']
+        except KeyError as k:
+            print ("Missing: %s from configuration!" % k)
+            return False
+        return True
+    }
 
     #-------------------------------------------------
     # Connect to serial port    
