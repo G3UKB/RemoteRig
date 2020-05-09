@@ -70,7 +70,6 @@ class ReaderThrd (threading.Thread):
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         #self.__addr = client_addr
         self.__addr = (client_ip, client_port)
-        print(self.__addr)
         self.__sock.settimeout(1)
         
         self.__terminate = False
