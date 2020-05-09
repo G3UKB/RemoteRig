@@ -215,7 +215,9 @@ class SerialClient:
         # Bind address is our ip, control port is provided in args
         # Client address we get from the first receive.
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.__localip = socket.gethostbyname(socket.gethostname())
+        self.__localip = self.__get_local_ip()
+        if len(self.__localip) == 0:
+            return 0
         addr = (self.__localip, self.__control_port)
         sock.bind(addr)
         sock.settimeout(1)
@@ -294,7 +296,24 @@ class SerialClient:
             return False
         return True    
     
-    
+    #-------------------------------------------------
+    # Get my local ip address   
+    def __get_local_ip(self):
+        
+        if platform.system() == 'Windows':
+            return socket.gethostbyname(socket.gethostname())
+        elif platform.system() == 'Linux':
+            ip_address = '';
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8",80))
+            ip_address = s.getsockname()[0]
+            s.close()
+            return ip_address
+        else:
+            print ("Sorry, platform is %s which is not supported!" % platform.system())
+            return ''
+            
+        
 #=====================================================
 # Entry point
 #=====================================================

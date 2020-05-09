@@ -300,7 +300,7 @@ class SerialClient:
             self.__net_p['controlport'] = int(s1['controlport'])
             self.__net_p['serverport'] = int(s1['serverport'])                                            
             self.__net_p['localport'] = int(s1['localport'])
-            self.__net_p['localip'] = socket.gethostbyname(socket.gethostname())
+            self.__net_p['localip'] = self.__get_local_ip()
             # Serial
             self.__cli_p['port'] = s2['client']
             self.__svr_p['port'] = s2['server']
@@ -344,6 +344,23 @@ class SerialClient:
             return False
         return True    
     
+    #-------------------------------------------------
+    # Get my local ip address   
+    def __get_local_ip(self):
+        
+        if platform.system() == 'Windows':
+            return socket.gethostbyname(socket.gethostname())
+        elif platform.system() == 'Linux':
+            ip_address = '';
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8",80))
+            ip_address = s.getsockname()[0]
+            s.close()
+            return ip_address
+        else:
+            print ("Sorry, platform is %s which is not supported!" % platform.system())
+            return ''
+        
 #=====================================================
 # Entry point
 #=====================================================
