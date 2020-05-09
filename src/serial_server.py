@@ -40,6 +40,7 @@ import socket
 import threading
 import queue
 import pickle
+import platform
 
 """
 The server consists of two threads:

@@ -41,6 +41,7 @@ import threading
 import queue
 import pickle
 import configparser
+import platform
 
 """
 The client consists of two threads:
