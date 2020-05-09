@@ -304,7 +304,10 @@ class SerialClient:
             self.__net_p['localip'] = self.__get_local_ip()
             # Serial
             self.__cli_p['port'] = s2['client']
-            self.__svr_p['port'] = s2['server']
+            if platform.system() == 'Windows':
+                self.__svr_p['port'] = s2['winserver']
+            else:
+                self.__svr_p['port'] = s2['linserver']
             self.__cli_p['baud'] = int(s3['baudrate'])
             self.__svr_p['baud'] = int(s4['baudrate'])
             self.__cli_p['databits'] = int(s3['databits'])
