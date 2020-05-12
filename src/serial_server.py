@@ -192,7 +192,7 @@ class WriterThrd (threading.Thread):
 class SerialClient: 
     #-------------------------------------------------
     # Initialisation
-    def __init__(self, port) :
+    def __init__(self, port, power) :
         """
         Constructor
         
@@ -201,6 +201,7 @@ class SerialClient:
         """
 
         self.__control_port = port
+        self.__power = power
         
     #-------------------------------------------------
     # Main
@@ -244,6 +245,18 @@ class SerialClient:
             print("Expected connect, got ", data["rqst"])
             return 0
         
+        # Do we need to attempt a power-on
+        if power:
+            # Yes
+            try:
+                import power_control as pc
+            except:
+                print("Sorry, power control was requested but power_control.py is not present!")
+                power = False
+                
+            if power:
+                pc.power_on()   
+        
         # Start the threads
         reader_thread = ReaderThrd(client_addr[0], data["data"]["net"][1], self.__ser)
         reader_thread.start()
@@ -274,6 +287,10 @@ class SerialClient:
         writer_thread.terminate()
         writer_thread.join()
         
+        # Power down if required
+        if power:
+            pc.power_off()
+
         print("Serial Server exiting...")
         return 0
 
@@ -322,11 +339,21 @@ class SerialClient:
 # Start processing and wait for user to exit the application
 def main():
     
-    if len(sys.argv) != 2:
-        print ("Please supply the control port number on the command line!")
+    if len(sys.argv) < 2:
+        msg = """
+        serial_server.py control-port (e.g. 10000 - reqd)
+        \t power-control (e.g. true/false - optional)
+        """
+        print (msg)
         return
+    
+    power_control = False
+    if len(sys.argv) == 3:
+        if argv[2] == 'true':
+            power_control = True
+        
     try:
-        app = SerialClient(int(sys.argv[1]))
+        app = SerialClient(int(sys.argv[1]), power_control)
         sys.exit(app.main())
         
     except Exception as e:
