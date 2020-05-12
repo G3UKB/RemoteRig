@@ -23,33 +23,37 @@
 #     bob@bobcowdery.plus.com
 #
 
+import serial
+
 #=====================================================
 # Power Control for FT817
 
 #-------------------------------------------------
 # Power device on
-def power_on(serial):
+def power_on(serial_port):
     
     empty_seq = bytes([0x00,0x00,0x00,0x00,0x00])
     on_seq = bytes([0x00,0x00,0x00,0x00,0x0F])
     
+    print("Powering up rig...")
     try:
-        self.__ser_port.write(empty_seq)
-        self.__ser_port.write(on_seq)
+        serial_port.write(empty_seq)
+        serial_port.write(on_seq)
     except serial.SerialTimeoutException:
         # I guess we could get a timeout as well
         printf("Timeout trying to power-up rig!")
         
 #-------------------------------------------------
 # Power device on
-def power_off(serial):
+def power_off(serial_port):
     
+    print("Powering down rig...")
     empty_seq = bytes([0x00,0x00,0x00,0x00,0x00])
     off_seq = bytes([0x00,0x00,0x00,0x00,0x8F])
     
     try:
-        self.__ser_port.write(empty_seq)
-        self.__ser_port.write(off_seq)
+        serial_port.write(empty_seq)
+        serial_port.write(off_seq)
     except serial.SerialTimeoutException:
         # I guess we could get a timeout as well
         printf("Timeout trying to power-down rig!")

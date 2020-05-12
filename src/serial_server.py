@@ -68,7 +68,6 @@ class ReaderThrd (threading.Thread):
         self.__ser_port = serial_port
         
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #self.__addr = client_addr
         self.__addr = (client_ip, client_port)
         self.__sock.settimeout(1)
         
@@ -107,8 +106,10 @@ class ReaderThrd (threading.Thread):
         except serial.SerialTimeoutException:
             # I guess we could get a timeout as well
             return
-        except serial.SerialException:
+        except serial.SerialException as e:
+            # Force termination
             self.__terminate = True
+            print ('Exception [%s][%s]' % (str(e), traceback.format_exc()))
             return
         
         # Dispatch to server
@@ -183,7 +184,8 @@ class WriterThrd (threading.Thread):
         try:
             self.__ser_port.write(data) 
         except serial.SerialTimeoutException:
-            # I guess we could get a timeout as well
+            # I guess we could get a timeout
+            print("Timeout writing to serial port!")
             pass
         
 #=====================================================
@@ -246,16 +248,14 @@ class SerialClient:
             return 0
         
         # Do we need to attempt a power-on
-        if power:
+        if self.__power:
             # Yes
             try:
                 import power_control as pc
-            except:
-                print("Sorry, power control was requested but power_control.py is not present!")
-                power = False
-                
-            if power:
-                pc.power_on(self.__ser)   
+                pc.power_on(self.__ser) 
+            except Exception as e:
+                print("Sorry, power control was requested but failed to invoke! [%s]" % (str(e)))
+                self.__power = False
         
         # Start the threads
         reader_thread = ReaderThrd(client_addr[0], data["data"]["net"][1], self.__ser)
@@ -277,6 +277,9 @@ class SerialClient:
         data = pickle.loads(data)    
         # Close local port
         if data["rqst"] == "disconnect":
+            # Power down if required
+            if self.__power:
+                pc.power_off(self.__ser)
             self.__ser.close()
         else:
             print("Expected disconnect, got ", data["rqst"])
@@ -286,10 +289,6 @@ class SerialClient:
         reader_thread.join()
         writer_thread.terminate()
         writer_thread.join()
-        
-        # Power down if required
-        if power:
-            pc.power_off(self.__ser)
 
         print("Serial Server exiting...")
         return 0
@@ -349,7 +348,7 @@ def main():
     
     power_control = False
     if len(sys.argv) == 3:
-        if argv[2] == 'true':
+        if sys.argv[2] == 'true':
             power_control = True
         
     try:
