@@ -255,7 +255,7 @@ class SerialClient:
                 power = False
                 
             if power:
-                pc.power_on()   
+                pc.power_on(self.__ser)   
         
         # Start the threads
         reader_thread = ReaderThrd(client_addr[0], data["data"]["net"][1], self.__ser)
@@ -289,7 +289,7 @@ class SerialClient:
         
         # Power down if required
         if power:
-            pc.power_off()
+            pc.power_off(self.__ser)
 
         print("Serial Server exiting...")
         return 0
