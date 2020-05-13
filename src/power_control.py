@@ -27,6 +27,11 @@ import serial
 
 #=====================================================
 # Power Control for FT817
+# NOTE: This only works if the rig was manually powered-on. Then
+# when powered-off via CAT and provided power is still applied
+# the power-on command will work. Not terribly useful as it
+# requires the PSU to be left on continuously. Drain is 10mA when
+# in the sleep state.
 
 #-------------------------------------------------
 # Power device on
