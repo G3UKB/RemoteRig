@@ -189,14 +189,15 @@ class WriterThrd (threading.Thread):
 class SerialClient: 
     #-------------------------------------------------
     # Initialisation
-    def __init__(self) :
+    def __init__(self, conf) :
         """
         Constructor
         
         Arguments
             
         """
-
+        self.__conf = conf
+        
     #-------------------------------------------------
     # Main
     def main(self) :
@@ -209,7 +210,7 @@ class SerialClient:
         
         # Get configuration data
         config = configparser.ConfigParser()
-        params = config.read('serial.conf')
+        params = config.read(self.__conf)
         if len(params) == 0:
             print ("Failed to read 'serial.conf', please create and try again!")
             return 0
@@ -375,12 +376,17 @@ class SerialClient:
 #-------------------------------------------------
 # Start processing and wait for user to exit the application
 def main():
-    try:
-        app = SerialClient()
-        sys.exit(app.main())
-        
-    except Exception as e:
-        print ('Exception from main SerialServer code','Exception [%s][%s]' % (str(e), traceback.format_exc()))
+    
+    if len(sys.argv) != 2:
+        print("Please supply a configuration filename!")
+        print("python serial_client conf_filename")
+    else:
+        try:
+            app = SerialClient(sys.argv[1])
+            sys.exit(app.main())
+            
+        except Exception as e:
+            print ('Exception from main SerialServer code','Exception [%s][%s]' % (str(e), traceback.format_exc()))
 
 #-------------------------------------------------
 # Enter here when run as script        
