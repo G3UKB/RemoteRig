@@ -110,6 +110,7 @@ class ReaderThrd (threading.Thread):
         
         # Dispatch to server
         try:
+            #print("Got: ", data)
             self.__sock.sendto(data, self.__addr)
         except socket.timeout:
             print ("Error sending UDP data!")
@@ -178,6 +179,7 @@ class WriterThrd (threading.Thread):
 
         # Write data to serial port
         try:
+            #print("Sent: ", data)
             self.__ser_port.write(data) 
         except serial.SerialTimeoutException:
             # I guess we could get a timeout as well
